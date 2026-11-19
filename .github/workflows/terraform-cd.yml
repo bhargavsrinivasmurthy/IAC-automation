@@ -1,0 +1,34 @@
+name: Terraform CD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-deployment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Generate Terraform plan
+        run: terraform plan -out=tfplan
+
+      - name: Deploy infrastructure
+        run: terraform apply -auto-approve tfplan
+
+      - name: Check application health
+        run: curl --fail --retry 10 --retry-delay 2 --retry-connrefused http://localhost:8080
+
+      - name: Destroy test infrastructure
+        if: always()
+        run: terraform destroy -auto-approve
