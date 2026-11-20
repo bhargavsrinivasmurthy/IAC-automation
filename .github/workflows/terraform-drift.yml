@@ -1,0 +1,65 @@
+
+name: Terraform Drift Detection
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift-detection:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: environments/staging
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Verify Docker
+        run: docker version
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Deploy infrastructure
+        run: terraform apply -auto-approve -input=false
+
+      - name: Simulate infrastructure drift
+        run: |
+          CONTAINER_ID=$(docker ps -q)
+          if [ "$(echo "$CONTAINER_ID" | grep -c .)" -ne 1 ]; then
+            echo "Expected exactly one running container."
+            exit 1
+          fi
+          docker rm -f "$CONTAINER_ID"
+          echo "Infrastructure drift simulated."
+
+      - name: Detect infrastructure drift
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -input=false -no-color
+          EXIT_CODE=$?
+          set -e
+
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "Drift detected successfully!"
+          elif [ "$EXIT_CODE" -eq 0 ]; then
+            echo "No drift detected."
+            exit 1
+          else
+            echo "Terraform plan failed."
+            exit 1
+          fi
+
+      - name: Destroy infrastructure
+        if: always()
+        run: terraform destroy -auto-approve -input=false
