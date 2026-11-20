@@ -12,6 +12,14 @@ jobs:
   terraform-validation:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        directory: [".", "environments/staging", "environments/production"]
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -27,6 +35,6 @@ jobs:
 
       - name: Validate Terraform
         run: terraform validate
-      
+
       - name: Generate Terraform plan
         run: terraform plan -input=false -no-color
